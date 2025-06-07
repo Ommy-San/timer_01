@@ -1,74 +1,95 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Ommyz Visual Timer_20250607</title>
-  <style>
-    body {
-      margin: 0;
-      background-color: #005133;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      height: 100vh;
-      justify-content: center;
-    }
-    canvas {
-      background-color: #005133;
-    }
-    .controls {
-      margin-top: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      align-items: center;
-    }
-    .hide {
-      display: none;
-    }
-    #footer {
-      position: fixed;
-      right: 10px;
-      bottom: 10px;
-      font-size: 12px;
-      color: #eee;
-      opacity: 0.5;
-      pointer-events: none;
-      user-select: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Ommyz Visual Timer</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #005133;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            justify-content: center;
+        }
+        canvas {
+            background-color: #005133;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            align-items: center;
+        }
+        .preset-buttons {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        .hide {
+            display: none;
+        }
+        #footer {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+            font-size: 12px;
+            color: #eee;
+            opacity: 0.5;
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
 </head>
 <body>
-  <canvas id="timerCanvas"></canvas>
-  <div class="controls" id="controlPanel">
+<canvas id="timerCanvas"></canvas>
+<div class="controls" id="controlPanel">
     <label>時間:
-      <input type="number" id="timeInputMinutes" min="0" max="60" value="0"> 分
-      <input type="number" id="timeInputSeconds" min="10" max="59" value="10"> 秒
+        <input type="number" id="timeInputMinutes" min="0" max="60" value="0"> 分
+        <input type="number" id="timeInputSeconds" min="10" max="59" value="10"> 秒
+        <input type="range" id="timeSlider" min="10" max="3600" value="10">
     </label>
     <label>円サイズ:<input type="range" id="sizeSlider" min="20" max="80" value="40"> %</label>
-    <label>画像サイズ:<input type="range" id="imgSizeSlider" min="20" max="100" value="40"> %</label>
     <button id="imageBtn">画像選択</button>
     <input type="file" id="imageInput" accept="image/*" style="display:none">
+    <label>画像サイズ:<input type="range" id="imgSizeSlider" min="20" max="100" value="40"> %</label>
     <button id="startBtn">開始</button>
     <button id="resetBtn">リセット</button>
-  </div>
-  <button id="stopBtn" class="hide">停止</button>
-  <div id="footer">Ommyz Visual Timer</div>
+</div>
+<div class="preset-buttons" id="presetButtons">
+    <button onclick="setPresetTime(1)">1分</button>
+    <button onclick="setPresetTime(3)">3分</button>
+    <button onclick="setPresetTime(5)">5分</button>
+    <button onclick="setPresetTime(10)">10分</button>
+    <button onclick="setPresetTime(15)">15分</button>
+    <button onclick="setPresetTime(20)">20分</button>
+    <button onclick="setPresetTime(25)">25分</button>
+    <button onclick="setPresetTime(30)">30分</button>
+    <button onclick="setPresetTime(60)">60分</button>
+</div>
+<button id="stopBtn" class="hide">停止</button>
+<div id="footer">Ommyz Visual Timer</div>
 
-  <script>
-    const canvas = document.getElementById("timerCanvas");
-    const ctx = canvas.getContext("2d");
-    const timeInputMinutes = document.getElementById("timeInputMinutes");
-    const timeInputSeconds = document.getElementById("timeInputSeconds");
-    const sizeSlider = document.getElementById("sizeSlider");
-    const imgSizeSlider = document.getElementById("imgSizeSlider");
-    const imageBtn = document.getElementById("imageBtn");
-    const imageInput = document.getElementById("imageInput");
-    const startBtn = document.getElementById("startBtn");
-    const resetBtn = document.getElementById("resetBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const controlPanel = document.getElementById("controlPanel");
+<script>
+    const canvas = document.getElementById('timerCanvas');
+    const ctx = canvas.getContext('2d');
+    const timeSlider = document.getElementById('timeSlider');
+    const timeInputMinutes = document.getElementById('timeInputMinutes');
+    const timeInputSeconds = document.getElementById('timeInputSeconds');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const imgSizeSlider = document.getElementById('imgSizeSlider');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const controlPanel = document.getElementById('controlPanel');
+    const presetButtons = document.getElementById('presetButtons');
+    const imageBtn = document.getElementById('imageBtn');
+    const imageInput = document.getElementById('imageInput');
 
     let totalTime = getTotalTimeFromInputs();
     let startTime = null;
@@ -76,226 +97,236 @@
     let radius, centerX, centerY;
     let animationId = null;
     let isRunning = false;
-    let isFinished = false;
     let sizePercent = parseInt(sizeSlider.value);
-    let imgScalePercent = parseInt(imgSizeSlider.value);
-
     let originalImg = null;
-    let imgCanvas = null;
+    let img = null;
     let imgX = 0, imgY = 0;
+    let dragging = false;
+    let dragOffsetX = 0, dragOffsetY = 0;
+    let imgScalePercent = parseInt(imgSizeSlider.value);
+    let isFinished = false;
 
-    let audioCtx = null;
+    let audioCtx = null; // Safari対応のためグローバルに宣言
 
     function getTotalTimeFromInputs() {
-      let min = parseInt(timeInputMinutes.value) || 0;
-      let sec = parseInt(timeInputSeconds.value) || 0;
-      let total = min * 60 + sec;
-      return Math.max(10, Math.min(total, 3600));
+        let minutes = parseInt(timeInputMinutes.value) || 0;
+        let seconds = parseInt(timeInputSeconds.value) || 0;
+        let total = minutes * 60 + seconds;
+        return Math.max(10, Math.min(total, 3600));
+    }
+
+    function updateInputsFromSlider() {
+        let total = parseInt(timeSlider.value);
+        timeInputMinutes.value = Math.floor(total / 60);
+        timeInputSeconds.value = total % 60;
+    }
+
+    function updateSliderFromInputs() {
+        totalTime = getTotalTimeFromInputs();
+        timeSlider.value = totalTime;
+    }
+
+    function setPresetTime(minutes) {
+        timeInputMinutes.value = minutes;
+        timeInputSeconds.value = 0;
+        updateSliderFromInputs();
+        drawTimer(1);
+    }
+
+    function hideControlsDuringTimer() {
+        controlPanel.classList.add('hide');
+        presetButtons.classList.add('hide');
+        stopBtn.classList.remove('hide');
+    }
+
+    function showControlsAfterTimer() {
+        controlPanel.classList.remove('hide');
+        presetButtons.classList.remove('hide');
+        stopBtn.classList.add('hide');
     }
 
     function resizeCanvas() {
-      const size = window.innerWidth * (sizePercent / 100);
-      canvas.width = size;
-      canvas.height = size;
-      radius = size * 0.4;
-      centerX = canvas.width / 2;
-      centerY = canvas.height / 2;
-      if (originalImg) resizeImage();
+        const size = window.innerWidth * (sizePercent / 100);
+        canvas.width = size;
+        canvas.height = size;
+        radius = size * 0.4;
+        centerX = canvas.width / 2;
+        centerY = canvas.height / 2;
+        if (originalImg) resizeImage();
     }
 
     function resizeImage() {
-      const maxSize = radius * 2 * 0.7;
-      const desiredSize = maxSize * (imgScalePercent / 100);
-      const aspect = originalImg.width / originalImg.height;
-
-      imgCanvas = document.createElement("canvas");
-      if (aspect >= 1) {
-        imgCanvas.width = desiredSize;
-        imgCanvas.height = desiredSize / aspect;
-      } else {
-        imgCanvas.height = desiredSize;
-        imgCanvas.width = desiredSize * aspect;
-      }
-
-      const tempCtx = imgCanvas.getContext("2d");
-      tempCtx.drawImage(originalImg, 0, 0, imgCanvas.width, imgCanvas.height);
-
-      imgX = centerX - imgCanvas.width / 2;
-      imgY = centerY - imgCanvas.height / 2;
-    }
-
-    function applyGrayscale(canvas) {
-      const ctx = canvas.getContext("2d");
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const avg = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        data[i] = data[i + 1] = data[i + 2] = avg;
-      }
-      ctx.putImageData(imgData, 0, 0);
+        const maxSize = radius * 2 * 0.7;
+        const desiredSize = maxSize * (imgScalePercent / 100);
+        const aspect = originalImg.width / originalImg.height;
+        img = document.createElement('canvas');
+        if (aspect >= 1) {
+            img.width = Math.min(desiredSize, maxSize);
+            img.height = img.width / aspect;
+        } else {
+            img.height = Math.min(desiredSize, maxSize);
+            img.width = img.height * aspect;
+        }
+        const imgCtx = img.getContext('2d');
+        imgCtx.drawImage(originalImg, 0, 0, img.width, img.height);
+        imgX = centerX - img.width / 2;
+        imgY = centerY - img.height / 2;
     }
 
     function drawTimer(percentage) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      let color = percentage <= 0.05 ? "red" : "limegreen";
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let color = (percentage <= 0.05) ? "red" : "limegreen";
 
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-      ctx.strokeStyle = "#ccc";
-      ctx.lineWidth = radius * 0.2;
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#ccc";
+        ctx.lineWidth = radius * 0.2;
+        ctx.stroke();
 
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 - 2 * Math.PI * percentage, true);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, -Math.PI / 2, -Math.PI / 2 - 2 * Math.PI * percentage, true);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
 
-      if (imgCanvas) {
-        if (isFinished) {
-          const temp = document.createElement("canvas");
-          temp.width = imgCanvas.width;
-          temp.height = imgCanvas.height;
-          const tctx = temp.getContext("2d");
-          tctx.drawImage(imgCanvas, 0, 0);
-          applyGrayscale(temp);
-          ctx.drawImage(temp, imgX, imgY);
-        } else {
-          ctx.drawImage(imgCanvas, imgX, imgY);
+        if (img) {
+            ctx.filter = isFinished ? 'grayscale(100%)' : 'none';
+            ctx.drawImage(img, imgX, imgY);
+            ctx.filter = 'none';
         }
-      }
+    }
+
+    function playHighKiraKiraAlarm() {
+        if (!audioCtx) return;
+        const notes = [
+            { freq: 1046.5, duration: 500 }, { freq: 1046.5, duration: 500 },
+            { freq: 1568.0, duration: 500 }, { freq: 1568.0, duration: 500 },
+            { freq: 1760.0, duration: 500 }, { freq: 1760.0, duration: 500 },
+            { freq: 1568.0, duration: 1000 },
+            { freq: 1396.9, duration: 500 }, { freq: 1396.9, duration: 500 },
+            { freq: 1318.5, duration: 500 }, { freq: 1318.5, duration: 500 },
+            { freq: 1174.7, duration: 500 }, { freq: 1174.7, duration: 500 },
+            { freq: 1046.5, duration: 1000 },
+        ];
+        let currentTime = audioCtx.currentTime;
+        notes.forEach(note => {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(note.freq, currentTime);
+            gainNode.gain.setValueAtTime(0.15, currentTime);
+            oscillator.connect(gainNode).connect(audioCtx.destination);
+            oscillator.start(currentTime);
+            oscillator.stop(currentTime + note.duration / 1000);
+            currentTime += note.duration / 1000;
+        });
     }
 
     function animateTimer(timestamp) {
-      if (!startTime) startTime = timestamp;
-      elapsedTime = (timestamp - startTime) / 1000;
-      let remaining = Math.max(totalTime - elapsedTime, 0);
-      drawTimer(remaining / totalTime);
-      if (remaining > 0) {
-        animationId = requestAnimationFrame(animateTimer);
-      } else {
-        isRunning = false;
-        isFinished = true;
-        drawTimer(0);
-        playAlarm();
-        controlPanel.classList.remove("hide");
-        stopBtn.classList.add("hide");
-      }
-    }
-
-    function playAlarm() {
-      if (!audioCtx) return;
-      const notes = [
-        { freq: 1046.5, duration: 500 }, { freq: 1568.0, duration: 500 },
-        { freq: 1760.0, duration: 500 }, { freq: 1568.0, duration: 1000 }
-      ];
-      let now = audioCtx.currentTime;
-      for (let note of notes) {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(note.freq, now);
-        gain.gain.setValueAtTime(0.2, now);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(now);
-        osc.stop(now + note.duration / 1000);
-        now += note.duration / 1000;
-      }
+        if (!startTime) startTime = timestamp;
+        elapsedTime = (timestamp - startTime) / 1000;
+        let remaining = Math.max(totalTime - elapsedTime, 0);
+        drawTimer(remaining / totalTime);
+        if (remaining > 0) {
+            animationId = requestAnimationFrame(animateTimer);
+        } else {
+            isRunning = false;
+            isFinished = true;
+            drawTimer(0);
+            playHighKiraKiraAlarm();
+            showControlsAfterTimer();
+        }
     }
 
     function startTimer() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      totalTime = getTotalTimeFromInputs();
-      elapsedTime = 0;
-      startTime = null;
-      isFinished = false;
-      isRunning = true;
-      controlPanel.classList.add("hide");
-      stopBtn.classList.remove("hide");
-      cancelAnimationFrame(animationId);
-      animationId = requestAnimationFrame(animateTimer);
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        cancelAnimationFrame(animationId);
+        elapsedTime = 0;
+        startTime = null;
+        isFinished = false;
+        hideControlsDuringTimer();
+        isRunning = true;
+        animationId = requestAnimationFrame(animateTimer);
     }
 
     function stopTimer() {
-      if (isRunning) {
-        cancelAnimationFrame(animationId);
-        isRunning = false;
-        controlPanel.classList.remove("hide");
-        stopBtn.classList.add("hide");
-      }
+        if (isRunning) {
+            cancelAnimationFrame(animationId);
+            isRunning = false;
+            showControlsAfterTimer();
+        }
     }
 
     function resetTimer() {
-      cancelAnimationFrame(animationId);
-      isRunning = false;
-      isFinished = false;
-      elapsedTime = 0;
-      startTime = null;
-      imgCanvas = null;
-      originalImg = null;
-      imageInput.value = "";
-      timeInputMinutes.value = 0;
-      timeInputSeconds.value = 10;
-      controlPanel.classList.remove("hide");
-      stopBtn.classList.add("hide");
-      drawTimer(1);
+        cancelAnimationFrame(animationId);
+        elapsedTime = 0;
+        isFinished = false;
+        img = null;
+        originalImg = null;
+        imageInput.value = "";
+        timeInputMinutes.value = 0;
+        timeInputSeconds.value = 10;
+        updateSliderFromInputs();
+        drawTimer(1);
     }
+
+    startBtn.addEventListener('click', startTimer);
+    stopBtn.addEventListener('click', stopTimer);
+    resetBtn.addEventListener('click', resetTimer);
+    timeSlider.addEventListener('input', () => { updateInputsFromSlider(); drawTimer(1); });
+    timeInputMinutes.addEventListener('input', () => { updateSliderFromInputs(); drawTimer(1); });
+    timeInputSeconds.addEventListener('input', () => { updateSliderFromInputs(); drawTimer(1); });
+    sizeSlider.addEventListener('input', () => { sizePercent = parseInt(sizeSlider.value); resizeCanvas(); drawTimer(1); });
+    imgSizeSlider.addEventListener('input', () => { imgScalePercent = parseInt(imgSizeSlider.value); if (originalImg) { resizeImage(); drawTimer(1); } });
+    imageBtn.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleImageFile(e.target.files[0]); });
+    window.addEventListener('resize', () => { resizeCanvas(); drawTimer(isRunning ? Math.max(totalTime - elapsedTime, 0) / totalTime : 1); });
+
+    canvas.addEventListener('dragover', (e) => e.preventDefault());
+    canvas.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) handleImageFile(e.dataTransfer.files[0]); });
+    canvas.addEventListener('mousedown', (e) => {
+        if (img) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            if (x >= imgX && x <= imgX + img.width && y >= imgY && y <= imgY + img.height) {
+                dragging = true;
+                dragOffsetX = x - imgX;
+                dragOffsetY = y - imgY;
+            }
+        }
+    });
+    canvas.addEventListener('mousemove', (e) => {
+        if (dragging) {
+            const rect = canvas.getBoundingClientRect();
+            imgX = e.clientX - rect.left - dragOffsetX;
+            imgY = e.clientY - rect.top - dragOffsetY;
+            drawTimer(1);
+        }
+    });
+    canvas.addEventListener('mouseup', () => dragging = false);
 
     function handleImageFile(file) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-          originalImg = img;
-          resizeImage();
-          drawTimer(1);
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const image = new Image();
+                image.onload = () => {
+                    originalImg = image;
+                    resizeImage();
+                    drawTimer(1);
+                };
+                image.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
     }
 
-    // イベント
-    window.addEventListener("resize", () => {
-      resizeCanvas();
-      drawTimer(1);
-    });
-
-    imageBtn.addEventListener("click", () => imageInput.click());
-    imageInput.addEventListener("change", e => {
-      if (e.target.files.length > 0) handleImageFile(e.target.files[0]);
-    });
-
-    canvas.addEventListener("dragover", e => e.preventDefault());
-    canvas.addEventListener("drop", e => {
-      e.preventDefault();
-      if (e.dataTransfer.files.length > 0) handleImageFile(e.dataTransfer.files[0]);
-    });
-
-    sizeSlider.addEventListener("input", () => {
-      sizePercent = parseInt(sizeSlider.value);
-      resizeCanvas();
-      drawTimer(1);
-    });
-
-    imgSizeSlider.addEventListener("input", () => {
-      imgScalePercent = parseInt(imgSizeSlider.value);
-      if (originalImg) {
-        resizeImage();
-        drawTimer(1);
-      }
-    });
-
-    startBtn.addEventListener("click", startTimer);
-    stopBtn.addEventListener("click", stopTimer);
-    resetBtn.addEventListener("click", resetTimer);
-
-    // 初期化
     resizeCanvas();
     drawTimer(1);
-  </script>
+</script>
 </body>
 </html>
